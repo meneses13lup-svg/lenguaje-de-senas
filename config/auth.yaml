@@ -1,0 +1,15 @@
+credentials:
+  usernames:
+    maria@senavoz.com:
+      email: maria@senavoz.com
+      name: María González
+      password: $2b$12$bIRLR7NJKBfSxjYUNI4PRuz3Er25A2ht3oOXRhwN7mFESC.eVS2ma
+      plan: personal
+
+cookie:
+  name: senavoz_auth
+  key: cambia_esto_por_un_string_aleatorio_largo_y_seguro
+  expiry_days: 30
+
+pre-authorized:
+  emails: []
