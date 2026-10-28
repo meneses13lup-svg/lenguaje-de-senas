@@ -1,5 +1,6 @@
  # SeñaVoz — Traductor de Lengua de Señas Mexicana
 
+
 ![Python](https://img.shields.io/badge/Python-3.11-blue?style=flat-square&logo=python)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.15-orange?style=flat-square&logo=tensorflow)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.30-red?style=flat-square&logo=streamlit)
@@ -11,9 +12,7 @@
 El proyecto fue desarrollado como parte de la materia de **Reconocimiento de Patrones** en la **Universidad Autónoma del Estado de México (UAEM) - Centro Universitario Nezahualcóyotl**.
 
 ---
-
-## ✨ Características principales
-
+##  Características principales
 - **Reconocimiento en tiempo real:** Detecta 27 letras estáticas (A-Z + Ñ) usando MediaPipe Hands.
 - **Red Neuronal (MLP):** Clasificación de las señas mediante un Perceptrón Multicapa entrenado con un dataset propio.
 - **Interfaz amigable:** UI construida en Streamlit con diseño personalizado (CSS).
@@ -22,8 +21,7 @@ El proyecto fue desarrollado como parte de la materia de **Reconocimiento de Pat
 - **Procesamiento local:** Todo ocurre en la máquina del usuario, sin enviar video a la nube (Privacidad 100% garantizada).
 
 ---
-
-## 🛠️ Stack Tecnológico
+##  Stack Tecnológico
 
 - **Lenguaje:** Python 3.11
 - **Visión por Computadora:** OpenCV, MediaPipe
@@ -35,8 +33,7 @@ El proyecto fue desarrollado como parte de la materia de **Reconocimiento de Pat
 - **Pruebas:** Pytest, Flake8
 
 ---
-
-## 📂 Estructura del Proyecto
+##  Estructura del Proyecto
 
 ```text
 senavoz/
