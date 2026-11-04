@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit_authenticator as stauth
 import yaml
 from pathlib import Path
-from src.utils.config import Config
+from backend.utils.config import Config
 
 CONFIG_PATH = Path(Config.ROOT_DIR) / "config" / "auth.yaml"
 

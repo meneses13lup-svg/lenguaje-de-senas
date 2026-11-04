@@ -1,0 +1,26 @@
+# Entornos virtuales
+venv/
+venv312/
+.venv/
+
+# Datos y modelos pesados (no queremos subir el CSV ni los modelos a GitHub)
+data/*.csv
+models/*.h5
+models/*.json
+hand_landmarker.task
+
+# Base de datos local
+data/*.db
+
+# Configuraciones privadas
+.env
+config/auth.yaml
+
+# Archivos basura de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db

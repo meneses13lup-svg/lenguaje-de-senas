@@ -1,26 +1,15 @@
 import streamlit as st
 
 def render_login(authenticator):
-    # 1. Ocultar la barra lateral izquierda (la de "app" y "login") solo en esta pantalla
-    st.markdown(
-        """
-        <style>
-            [data-testid="stSidebar"] { display: none; }
-            [data-testid="stHeader"] { display: none; }
-        </style>
-        """, 
-        unsafe_allow_html=True
-    )
-    
-    # 2. Abrir el contenedor principal (el que tiene la sombra y los bordes redondos)
+    # 1. Abrir el contenedor principal (el que tiene la sombra y los bordes redondos)
     st.markdown('<div class="login-container">', unsafe_allow_html=True)
     
-    # 3. Crear las dos columnas (Izquierda oscura, Derecha formulario)
+    # 2. Crear las dos columnas (Izquierda oscura, Derecha formulario)
     col_left, col_right = st.columns([1.05, 0.95], gap="large")
 
     # ==================== PANEL IZQUIERDO ====================
     with col_left:
-        # Usamos una sola cadena de texto sin saltos de línea extraños para que Streamlit no se confunda
+        # Usamos una sola cadena de texto sin saltos de línea extraños
         html_izq = """
         <div class="login-left">
             <div class="brand">
@@ -67,7 +56,7 @@ def render_login(authenticator):
         authenticator.login(
             location="main",
             fields={
-                "Form name": " ",  # Espacio en blanco para ocultar el título feo por defecto
+                "Form name": " ",  # Espacio en blanco para ocultar el título por defecto
                 "Username": "Correo electrónico",
                 "Password": "Contraseña",
                 "Login": "Iniciar sesión",
@@ -84,5 +73,5 @@ def render_login(authenticator):
         <p class="secure-message">🔒 Tu información está protegida y cifrada.</p>
         """, unsafe_allow_html=True)
 
-    # 4. Cerrar el contenedor principal
+    # 3. Cerrar el contenedor principal
     st.markdown('</div>', unsafe_allow_html=True)
