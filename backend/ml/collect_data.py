@@ -112,9 +112,9 @@ def main():
             cv2.imshow("Recolector de Datos - SeñaVoz", frame)
 
             key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
+            if key == ord('2'):
                 break
-            elif key == ord('s') and landmarks is not None and current_letter:
+            elif key == ord('4') and landmarks is not None and current_letter:
                 guardando = True
                 muestras_guardadas = 0
                 print(f"⏳ Grabando 50 muestras para la letra {current_letter}...")
