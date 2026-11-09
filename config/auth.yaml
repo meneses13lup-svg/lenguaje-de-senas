@@ -1,15 +1,18 @@
+cookie:
+  expiry_days: 30
+  key: cambia_esto_por_un_string_aleatorio_largo_y_seguro
+  name: senavoz_auth
 credentials:
   usernames:
     maria@senavoz.com:
       email: maria@senavoz.com
-      name: María González
+      name: "Mar\xEDa Gonz\xE1lez"
       password: $2b$12$bIRLR7NJKBfSxjYUNI4PRuz3Er25A2ht3oOXRhwN7mFESC.eVS2ma
       plan: personal
-
-cookie:
-  name: senavoz_auth
-  key: cambia_esto_por_un_string_aleatorio_largo_y_seguro
-  expiry_days: 30
-
+    meneses13lup@gmail.com:
+      email: meneses13lup@gmail.com
+      name: Lesly Guadalupe Meneses Atzin
+      password: $2b$12$JGEjpnuNVGuSP6zJhgIDwel8vavycQPvH7Wb3Ur9foilWik5AW8Jq
+      plan: personal
 pre-authorized:
   emails: []

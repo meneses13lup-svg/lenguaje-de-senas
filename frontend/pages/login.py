@@ -1,7 +1,8 @@
 import streamlit as st
+from backend.auth.authenticator import registrar_usuario_yaml
 
 def render_login(authenticator):
-    # 1. Abrir el contenedor principal (el que tiene la sombra y los bordes redondos)
+    # 1. Abrir el contenedor principal
     st.markdown('<div class="login-container">', unsafe_allow_html=True)
     
     # 2. Crear las dos columnas (Izquierda oscura, Derecha formulario)
@@ -9,7 +10,6 @@ def render_login(authenticator):
 
     # ==================== PANEL IZQUIERDO ====================
     with col_left:
-        # Usamos una sola cadena de texto sin saltos de línea extraños
         html_izq = """
         <div class="login-left">
             <div class="brand">
@@ -33,7 +33,7 @@ def render_login(authenticator):
                             <span class="status-dot"></span>
                             <span>Reconocimiento activo</span>
                         </div>
-                        <span class="precision-badge">98% precisión</span>
+                        <span class="precision-badge">100% precisión</span>
                     </div>
                 </div>
             </div>
@@ -52,20 +52,46 @@ def render_login(authenticator):
         """
         st.markdown(html_der, unsafe_allow_html=True)
 
-        # Formulario de autenticación (Streamlit-authenticator)
-        authenticator.login(
-            location="main",
-            fields={
-                "Form name": " ",  # Espacio en blanco para ocultar el título por defecto
-                "Username": "Correo electrónico",
-                "Password": "Contraseña",
-                "Login": "Iniciar sesión",
-            }
-        )
-        
-        # Mostrar error si la contraseña está mal
-        if st.session_state.get("authentication_status") is False:
-            st.error("❌ Correo o contraseña incorrectos.")
+        # Creamos dos pestañas: Iniciar Sesión y Crear Cuenta
+        tab1, tab2 = st.tabs(["Iniciar Sesión", "Crear Cuenta"])
+
+        with tab1:
+            # Formulario de Login (Librería original)
+            authenticator.login(
+                location="main",
+                fields={
+                    "Form name": " ", 
+                    "Username": "Correo electrónico",
+                    "Password": "Contraseña",
+                    "Login": "Iniciar sesión",
+                }
+            )
+            
+            if st.session_state.get("authentication_status") is False:
+                st.error("❌ Correo o contraseña incorrectos.")
+
+        with tab2:
+            # Formulario de Registro manual (Guardado en YAML)
+            with st.form("registro_form", clear_on_submit=True):
+                new_email = st.text_input("Correo electrónico")
+                new_name = st.text_input("Nombre completo")
+                new_pass = st.text_input("Contraseña", type="password")
+                new_pass2 = st.text_input("Confirmar contraseña", type="password")
+                
+                submitted = st.form_submit_button("Registrarse", use_container_width=True)
+                
+                if submitted:
+                    if not new_email or not new_name or not new_pass:
+                        st.warning("⚠️ Por favor, llena todos los campos.")
+                    elif new_pass != new_pass2:
+                        st.error("❌ Las contraseñas no coinciden.")
+                    else:
+                        # Llamamos a la función que guarda en el YAML
+                        exito, mensaje = registrar_usuario_yaml(new_email, new_name, new_pass)
+                        if exito:
+                            st.success(f"✅ {mensaje} Ahora puedes iniciar sesión en la pestaña 'Iniciar Sesión'.")
+                        else:
+                            st.error(f"❌ {mensaje}")
 
         # Textos de la parte de abajo del formulario
         st.markdown("""

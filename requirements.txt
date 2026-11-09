@@ -1,0 +1,16 @@
+streamlit
+streamlit-authenticator
+opencv-python
+mediapipe
+numpy
+tensorflow
+scikit-learn
+pandas
+joblib
+python-dotenv
+pillow
+sqlalchemy
+passlib[bcrypt]
+pyyaml
+pytest
+pip-audit
