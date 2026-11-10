@@ -14,13 +14,11 @@ import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
-# Inicializar variables
+# Variables de sesión
 if "texto" not in st.session_state:
     st.session_state.texto = ""
 if "letra_actual" not in st.session_state:
     st.session_state.letra_actual = ""
-if "ultima_letra_agregada" not in st.session_state:
-    st.session_state.ultima_letra_agregada = ""
 
 @st.cache_resource
 def load_model():
@@ -71,43 +69,29 @@ class VideoProcessor(VideoProcessorBase):
                     if max_dist > 0:
                         coords = coords / max_dist
                     
-                    features = coords.flatten()
-                    prediction = self.model.predict(np.expand_dims(features, axis=0), verbose=0)
+                    prediction = self.model.predict(np.expand_dims(coords.flatten(), axis=0), verbose=0)
                     confidence = np.max(prediction) * 100
                     
                     if confidence > 70:
                         letra = self.encoder.inverse_transform([np.argmax(prediction)])[0]
                         cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                        # Actualizar variable
+                        # Guardamos en la sesión de Streamlit (esto SÍ funciona en el hilo de la app)
                         st.session_state.letra_actual = letra
                     else:
                         cv2.putText(img, "Analizando...", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                 else:
                     cv2.putText(img, "Mano no detectada", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    st.session_state.letra_actual = ""
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
-    # --- DISEÑO CSS PREMIUM + BOTÓN CERRAR SESIÓN ---
+    # --- DISEÑO CSS ---
     st.markdown("""
     <style>
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
-        
-        .stApp {
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-        }
-        
-        .custom-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-            margin-bottom: 2rem;
-            border-bottom: 1px solid #e2e8f0;
-        }
+        .stApp { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); }
         
         .panel-traduccion {
             background: linear-gradient(145deg, #0f172a, #1e293b);
@@ -167,7 +151,7 @@ def render_traductor():
     </style>
     """, unsafe_allow_html=True)
 
-    # --- HEADER PERSONALIZADO ---
+    # --- HEADER CON CERRAR SESIÓN ---
     col_header1, col_header2 = st.columns([3, 1])
     with col_header1:
         st.markdown('<h2 style="margin:0; font-weight: 900; color:#0f172a;">Traductor en vivo</h2>', unsafe_allow_html=True)
@@ -176,7 +160,6 @@ def render_traductor():
             st.session_state["authentication_status"] = None
             st.rerun()
 
-    # --- CONTENIDO PRINCIPAL ---
     st.markdown('<p style="color: #06b6d4; font-weight: 800; font-size: 0.85rem; letter-spacing: 0.1em;">SESIÓN NUEVA</p>', unsafe_allow_html=True)
     st.markdown('<h1 style="margin-top: 0; font-size: 2.8rem; font-weight: 900; color: #0f172a;">Comienza a comunicarte</h1>', unsafe_allow_html=True)
 
@@ -194,17 +177,14 @@ def render_traductor():
     with col2:
         st.markdown("### ✨ Traducción")
         
-        # LÓGICA PARA ESCRIBIR EL TEXTO
-        letra_actual = st.session_state.get("letra_actual", "")
+        # LÓGICA SIMPLE Y EFECTIVA
+        letra = st.session_state.get("letra_actual", "")
         
-        if letra_actual and letra_actual != st.session_state.ultima_letra_agregada:
-            st.session_state.texto += letra_actual
-            st.session_state.ultima_letra_agregada = letra_actual
-            st.rerun()
-
-        # Si no hay letra nueva, limpiamos el bloqueo
-        if not letra_actual:
-             st.session_state.ultima_letra_agregada = ""
+        # Si hay una letra nueva, la agregamos al texto
+        if letra:
+            if not st.session_state.texto.endswith(letra):
+                st.session_state.texto += letra
+                st.session_state.letra_actual = "" # Limpiamos para que no se repita
 
         texto_mostrar = st.session_state.texto if st.session_state.texto else "El texto aparecerá aquí..."
         clase_texto = "texto-traducido" if st.session_state.texto else "texto-vacio"
@@ -213,24 +193,18 @@ def render_traductor():
         <div class="panel-traduccion">
             <div><span class="badge-idioma">ESPAÑOL</span></div>
             <div class="{clase_texto}">{texto_mostrar}</div>
-            {f'<div class="letra-detectada-badge">Última letra: {letra_actual}</div>' if letra_actual else ''}
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-        if st.button("🗑️ Borrar todo el texto", use_container_width=True):
-            st.session_state.texto = ""
-            st.session_state.letra_actual = ""
-            st.session_state.ultima_letra_agregada = ""
-            st.rerun()
-
-    # 🚨 EL TRUCO FINAL: RECARGA AUTOMÁTICA (POLLING) 🚨
-    # Usamos JavaScript para forzar a la página a recargarse cada 1.5 segundos
-    st.markdown("""
-        <script>
-            setTimeout(function(){
-                window.parent.location.reload();
-            }, 1500);
-        </script>
-    """, unsafe_allow_html=True)
+        # BOTÓN DE ACTUALIZACIÓN MANUAL (El truco para que funcione en la nube)
+        col_b1, col_b2 = st.columns(2)
+        with col_b1:
+            if st.button("🔄 Actualizar Texto", use_container_width=True, type="primary"):
+                st.rerun()
+        with col_b2:
+            if st.button("🗑️ Borrar Texto", use_container_width=True):
+                st.session_state.texto = ""
+                st.session_state.letra_actual = ""
+                st.rerun()
