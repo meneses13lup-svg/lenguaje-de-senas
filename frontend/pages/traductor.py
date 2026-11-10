@@ -11,15 +11,15 @@ import os
 import av
 import time
 
-# Conectar con la raíz del proyecto
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
-# Variables globales
 if "texto" not in st.session_state:
     st.session_state.texto = ""
-if "letra_detectada" not in st.session_state:
-    st.session_state.letra_detectada = ""
+if "letra_actual" not in st.session_state:
+    st.session_state.letra_actual = ""
+if "ultima_letra_agregada" not in st.session_state:
+    st.session_state.ultima_letra_agregada = ""
 
 @st.cache_resource
 def load_model():
@@ -70,33 +70,58 @@ class VideoProcessor(VideoProcessorBase):
                     if max_dist > 0:
                         coords = coords / max_dist
                     
-                    prediction = self.model.predict(np.expand_dims(coords.flatten(), axis=0), verbose=0)
+                    features = coords.flatten()
+                    prediction = self.model.predict(np.expand_dims(features, axis=0), verbose=0)
                     confidence = np.max(prediction) * 100
                     
                     if confidence > 70:
                         letra = self.encoder.inverse_transform([np.argmax(prediction)])[0]
                         cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                        
-                        # Guardamos en la sesión global
-                        st.session_state.letra_detectada = letra
+                        st.session_state.letra_actual = letra
                     else:
                         cv2.putText(img, "Analizando...", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                 else:
                     cv2.putText(img, "Mano no detectada", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    st.session_state.letra_detectada = ""
+                    st.session_state.letra_actual = ""
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
-    # --- DISEÑO CSS PREMIUM ---
+    # --- MAGIA PURA: INYECCIÓN DE CSS ---
     st.markdown("""
     <style>
-        /* Ocultar el menú de Streamlit y el pie de página */
+        /* Fondo con gradiente sutil para toda la app */
+        .stApp {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        }
+        
+        /* Ocultar el menú de Streamlit */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
+
+        /* HEADER PERSONALIZADO (Falso) */
+        .custom-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            margin-bottom: 2rem;
+        }
+        .custom-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
         
-        /* Panel de traducción estilo Neón/Oscuro */
+        /* PANEL DE TRADUCCIÓN OSCURO */
         .panel-traduccion {
             background: linear-gradient(145deg, #0f172a, #1e293b);
             border-radius: 24px;
@@ -109,8 +134,6 @@ def render_traductor():
             position: relative;
             overflow: hidden;
         }
-        
-        /* Efecto de luz brillante en la esquina */
         .panel-traduccion::before {
             content: '';
             position: absolute;
@@ -121,7 +144,6 @@ def render_traductor():
             opacity: 0.2;
             border-radius: 50%;
         }
-
         .badge-idioma {
             background-color: rgba(6, 182, 212, 0.15);
             border: 1px solid rgba(6, 182, 212, 0.3);
@@ -135,7 +157,6 @@ def render_traductor():
             letter-spacing: 0.1em;
             box-shadow: 0 0 15px rgba(6, 182, 212, 0.2);
         }
-
         .texto-traducido {
             font-size: 3.5rem;
             font-weight: 900;
@@ -146,7 +167,6 @@ def render_traductor():
             color: #ffffff;
             text-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
-
         .texto-vacio {
             font-size: 2rem;
             font-weight: 500;
@@ -155,7 +175,6 @@ def render_traductor():
             z-index: 10;
             font-style: italic;
         }
-
         .letra-detectada-badge {
             position: absolute;
             bottom: 20px;
@@ -168,18 +187,25 @@ def render_traductor():
             font-size: 1.5rem;
             box-shadow: 0 0 20px rgba(6,182,212,0.5);
         }
-        
-        /* Mejorar el aspecto del contenedor del video */
-        .stVideoProcessor {
-            border-radius: 20px;
-            overflow: hidden;
-            border: 2px solid #1e293b;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+
+        /* ESTILO PARA EL BOTÓN DE CERRAR SESIÓN EN EL HEADER */
+        .logout-btn-container {
+            display: flex;
+            justify-content: flex-end;
+        }
+        div[data-testid="stButton"] > button {
+            border-radius: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        div[data-testid="stButton"] > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # --- BARRA LATERAL ---
+    # --- BARRA LATERAL (Solo para el Logo) ---
     with st.sidebar:
         st.markdown("""
         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 30px;">
@@ -190,11 +216,18 @@ def render_traductor():
             </div>
         </div>
         """, unsafe_allow_html=True)
-        
-        st.markdown("---")
+
+    # --- HEADER PERSONALIZADO (Falso) CON BOTÓN DE CERRAR SESIÓN ---
+    col_header1, col_header2 = st.columns([3, 1])
+    with col_header1:
+        st.markdown('<div style="padding-top: 10px;"><h2 style="margin:0; font-weight: 900; color:#0f172a;">Traductor en vivo</h2></div>', unsafe_allow_html=True)
+    with col_header2:
+        # Aquí va el botón real de Streamlit
         if st.button("🚪 Cerrar sesión", use_container_width=True):
             st.session_state["authentication_status"] = None
             st.rerun()
+
+    st.markdown("<hr style='margin-top: 0; margin-bottom: 2rem; border-color: #e2e8f0;'>", unsafe_allow_html=True)
 
     # --- CONTENIDO PRINCIPAL ---
     st.markdown("""
@@ -204,41 +237,31 @@ def render_traductor():
 
     col1, col2 = st.columns([1.2, 1], gap="large")
 
-    # --- COLUMNA IZQUIERDA: CÁMARA ---
     with col1:
         st.markdown("### 📷 Cámara en vivo")
-        
-        # Usamos un contenedor para que WebRTC se vea bien
-        with st.container():
-            webrtc_streamer(
-                key="senavoz-video",
-                video_processor_factory=VideoProcessor,
-                rtc_configuration=RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}),
-                media_stream_constraints={"video": True, "audio": False},
-            )
+        webrtc_streamer(
+            key="senavoz-video",
+            video_processor_factory=VideoProcessor,
+            rtc_configuration=RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}),
+            media_stream_constraints={"video": True, "audio": False},
+        )
 
-    # --- COLUMNA DERECHA: TRADUCCIÓN ---
     with col2:
         st.markdown("### ✨ Traducción")
         
-        # Lógica para agregar letra automáticamente
-        letra = st.session_state.get("letra_detectada", "")
+        letra = st.session_state.get("letra_actual", "")
         
-        # Si la letra cambió y es válida, la agregamos al texto
-        if letra and letra != st.session_state.get("ultima_letra", ""):
+        if letra and letra != st.session_state.ultima_letra_agregada:
             st.session_state.texto += letra
-            st.session_state.ultima_letra = letra
-            st.rerun() # Recarga la pantalla para mostrar el nuevo texto
-        
-        # Si no hay letra, reseteamos el bloqueo para permitir escribir la misma letra otra vez
+            st.session_state.ultima_letra_agregada = letra
+            st.rerun() 
+            
         if not letra:
-            st.session_state.ultima_letra = ""
+             st.session_state.ultima_letra_agregada = ""
 
-        # Determinar qué mostrar
         texto_mostrar = st.session_state.texto if st.session_state.texto else "El texto aparecerá aquí..."
         clase_texto = "texto-traducido" if st.session_state.texto else "texto-vacio"
         
-        # HTML del panel con el diseño bonito
         st.markdown(f"""
         <div class="panel-traduccion">
             <div><span class="badge-idioma">ESPAÑOL</span></div>
@@ -249,9 +272,12 @@ def render_traductor():
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Botón para borrar texto
         if st.button("🗑️ Borrar todo el texto", use_container_width=True, type="primary"):
             st.session_state.texto = ""
-            st.session_state.letra_detectada = ""
-            st.session_state.ultima_letra = ""
+            st.session_state.letra_actual = ""
+            st.session_state.ultima_letra_agregada = ""
             st.rerun()
+
+    # Botón para forzar la actualización si no escribe
+    if st.sidebar.button("🔄 Actualizar pantalla", use_container_width=True):
+        st.rerun()
