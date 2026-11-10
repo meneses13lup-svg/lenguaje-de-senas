@@ -11,10 +11,11 @@ import os
 import av
 import time
 
+# Conectar con la raíz del proyecto
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
-# Diccionario global para comunicar el hilo del video con la interfaz
+# Inicializar shared_data de forma global para evitar errores en WebRTC
 if "shared_data" not in st.session_state:
     st.session_state.shared_data = {"letra": "", "timestamp": 0.0}
 
@@ -28,9 +29,14 @@ def load_model():
         return model, encoder
     return None, None
 
+# --- CLASE DE PROCESAMIENTO DE VIDEO EN VIVO (WEBRTC) ---
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         self.model, self.encoder = load_model()
+        
+        # Nos aseguramos de que shared_data exista en el hilo del video
+        if "shared_data" not in st.session_state:
+            st.session_state.shared_data = {"letra": "", "timestamp": 0.0}
         
         import mediapipe as mp
         BaseOptions = mp.tasks.BaseOptions
@@ -38,8 +44,9 @@ class VideoProcessor(VideoProcessorBase):
         HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
         VisionRunningMode = mp.tasks.vision.RunningMode
         
+        self.model_path_mp = "hand_landmarker.task"
         self.options = HandLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path="hand_landmarker.task"),
+            base_options=BaseOptions(model_asset_path=self.model_path_mp),
             running_mode=VisionRunningMode.VIDEO,
             num_hands=1,
             min_hand_detection_confidence=0.7
@@ -67,7 +74,8 @@ class VideoProcessor(VideoProcessorBase):
                     if max_dist > 0:
                         coords = coords / max_dist
                     
-                    prediction = self.model.predict(np.expand_dims(coords.flatten(), axis=0), verbose=0)
+                    features = coords.flatten()
+                    prediction = self.model.predict(np.expand_dims(features, axis=0), verbose=0)
                     confidence = np.max(prediction) * 100
                     
                     if confidence > 70:
@@ -75,7 +83,7 @@ class VideoProcessor(VideoProcessorBase):
                         cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                         
-                        # COMUNICACIÓN CON LA INTERFAZ
+                        # Guardar de forma segura
                         st.session_state.shared_data["letra"] = letra
                         st.session_state.shared_data["timestamp"] = time.time()
                     else:
@@ -86,10 +94,13 @@ class VideoProcessor(VideoProcessorBase):
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
+    # Inicializar variables en sesión
     if "texto" not in st.session_state:
         st.session_state.texto = ""
     if "ultima_letra_agregada" not in st.session_state:
         st.session_state.ultima_letra_agregada = ""
+    if "shared_data" not in st.session_state:
+        st.session_state.shared_data = {"letra": "", "timestamp": 0.0}
 
     # --- BARRA LATERAL ---
     with st.sidebar:
