@@ -3,18 +3,14 @@ venv/
 venv312/
 .venv/
 
-# Datos y modelos pesados (no queremos subir el CSV ni los modelos a GitHub)
+# Datos (NO subimos el CSV de entrenamiento)
 data/*.csv
-models/*.h5
-models/*.json
-hand_landmarker.task
 
-# Base de datos local
+# Base de datos local (No subimos la BD para no sobreescribir la de la nube)
 data/*.db
 
-# Configuraciones privadas
+# Configuraciones privadas (OJO: veremos qué hacer con auth.yaml)
 .env
-config/auth.yaml
 
 # Archivos basura de Python
 __pycache__/

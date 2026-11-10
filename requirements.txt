@@ -14,3 +14,4 @@ passlib[bcrypt]
 pyyaml
 pytest
 pip-audit
+streamlit-webrtc
