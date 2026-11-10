@@ -14,6 +14,7 @@ import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
+# Inicializar variables
 if "texto" not in st.session_state:
     st.session_state.texto = ""
 if "letra_actual" not in st.session_state:
@@ -78,6 +79,7 @@ class VideoProcessor(VideoProcessorBase):
                         letra = self.encoder.inverse_transform([np.argmax(prediction)])[0]
                         cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        # Actualizar variable
                         st.session_state.letra_actual = letra
                     else:
                         cv2.putText(img, "Analizando...", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
@@ -88,45 +90,30 @@ class VideoProcessor(VideoProcessorBase):
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
-    # --- MAGIA PURA: INYECCIÓN DE CSS ---
+    # --- DISEÑO CSS PREMIUM + BOTÓN CERRAR SESIÓN ---
     st.markdown("""
     <style>
-        /* Fondo con gradiente sutil para toda la app */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        
         .stApp {
             background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
         }
         
-        /* Ocultar el menú de Streamlit */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-
-        /* HEADER PERSONALIZADO (Falso) */
         .custom-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 2rem;
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            padding: 1rem 0;
             margin-bottom: 2rem;
-        }
-        .custom-header h1 {
-            margin: 0;
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #0f172a;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            border-bottom: 1px solid #e2e8f0;
         }
         
-        /* PANEL DE TRADUCCIÓN OSCURO */
         .panel-traduccion {
             background: linear-gradient(145deg, #0f172a, #1e293b);
             border-radius: 24px;
             padding: 30px;
-            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3);
             min-height: 400px;
             display: flex;
             flex-direction: column;
@@ -154,26 +141,17 @@ def render_traductor():
             color: #22d3ee;
             display: inline-block;
             margin-bottom: 25px;
-            letter-spacing: 0.1em;
-            box-shadow: 0 0 15px rgba(6, 182, 212, 0.2);
         }
         .texto-traducido {
             font-size: 3.5rem;
             font-weight: 900;
             line-height: 1.1;
-            font-family: 'Inter', sans-serif;
-            word-wrap: break-word;
-            z-index: 10;
             color: #ffffff;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
         .texto-vacio {
             font-size: 2rem;
             font-weight: 500;
             color: #64748b;
-            line-height: 1.4;
-            z-index: 10;
-            font-style: italic;
         }
         .letra-detectada-badge {
             position: absolute;
@@ -185,55 +163,22 @@ def render_traductor():
             border-radius: 12px;
             font-weight: 900;
             font-size: 1.5rem;
-            box-shadow: 0 0 20px rgba(6,182,212,0.5);
-        }
-
-        /* ESTILO PARA EL BOTÓN DE CERRAR SESIÓN EN EL HEADER */
-        .logout-btn-container {
-            display: flex;
-            justify-content: flex-end;
-        }
-        div[data-testid="stButton"] > button {
-            border-radius: 12px;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-        div[data-testid="stButton"] > button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # --- BARRA LATERAL (Solo para el Logo) ---
-    with st.sidebar:
-        st.markdown("""
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 30px;">
-            <div style="background: #06b6d4; width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 0 15px rgba(6,182,212,0.4);">🤟</div>
-            <div>
-                <h2 style="margin: 0; color: #0f172a; font-size: 1.4rem; font-weight: 800;">Seña<span style="color: #06b6d4;">Voz</span></h2>
-                <p style="margin: 0; color: #64748b; font-size: 0.65rem; letter-spacing: 0.1em; font-weight: 700;">SIN LÍMITES</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # --- HEADER PERSONALIZADO (Falso) CON BOTÓN DE CERRAR SESIÓN ---
+    # --- HEADER PERSONALIZADO ---
     col_header1, col_header2 = st.columns([3, 1])
     with col_header1:
-        st.markdown('<div style="padding-top: 10px;"><h2 style="margin:0; font-weight: 900; color:#0f172a;">Traductor en vivo</h2></div>', unsafe_allow_html=True)
+        st.markdown('<h2 style="margin:0; font-weight: 900; color:#0f172a;">Traductor en vivo</h2>', unsafe_allow_html=True)
     with col_header2:
-        # Aquí va el botón real de Streamlit
         if st.button("🚪 Cerrar sesión", use_container_width=True):
             st.session_state["authentication_status"] = None
             st.rerun()
 
-    st.markdown("<hr style='margin-top: 0; margin-bottom: 2rem; border-color: #e2e8f0;'>", unsafe_allow_html=True)
-
     # --- CONTENIDO PRINCIPAL ---
-    st.markdown("""
-        <p style="color: #06b6d4; font-weight: 800; font-size: 0.85rem; margin-bottom: 5px; letter-spacing: 0.1em;">SESIÓN NUEVA</p>
-        <h1 style="margin-top: 0; font-size: 2.8rem; font-weight: 900; color: #0f172a; letter-spacing: -0.02em; margin-bottom: 2rem;">Comienza a comunicarte</h1>
-    """, unsafe_allow_html=True)
+    st.markdown('<p style="color: #06b6d4; font-weight: 800; font-size: 0.85rem; letter-spacing: 0.1em;">SESIÓN NUEVA</p>', unsafe_allow_html=True)
+    st.markdown('<h1 style="margin-top: 0; font-size: 2.8rem; font-weight: 900; color: #0f172a;">Comienza a comunicarte</h1>', unsafe_allow_html=True)
 
     col1, col2 = st.columns([1.2, 1], gap="large")
 
@@ -249,14 +194,16 @@ def render_traductor():
     with col2:
         st.markdown("### ✨ Traducción")
         
-        letra = st.session_state.get("letra_actual", "")
+        # LÓGICA PARA ESCRIBIR EL TEXTO
+        letra_actual = st.session_state.get("letra_actual", "")
         
-        if letra and letra != st.session_state.ultima_letra_agregada:
-            st.session_state.texto += letra
-            st.session_state.ultima_letra_agregada = letra
-            st.rerun() 
-            
-        if not letra:
+        if letra_actual and letra_actual != st.session_state.ultima_letra_agregada:
+            st.session_state.texto += letra_actual
+            st.session_state.ultima_letra_agregada = letra_actual
+            st.rerun()
+
+        # Si no hay letra nueva, limpiamos el bloqueo
+        if not letra_actual:
              st.session_state.ultima_letra_agregada = ""
 
         texto_mostrar = st.session_state.texto if st.session_state.texto else "El texto aparecerá aquí..."
@@ -266,18 +213,24 @@ def render_traductor():
         <div class="panel-traduccion">
             <div><span class="badge-idioma">ESPAÑOL</span></div>
             <div class="{clase_texto}">{texto_mostrar}</div>
-            {f'<div class="letra-detectada-badge">Última letra: {letra}</div>' if letra else ''}
+            {f'<div class="letra-detectada-badge">Última letra: {letra_actual}</div>' if letra_actual else ''}
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-        if st.button("🗑️ Borrar todo el texto", use_container_width=True, type="primary"):
+        if st.button("🗑️ Borrar todo el texto", use_container_width=True):
             st.session_state.texto = ""
             st.session_state.letra_actual = ""
             st.session_state.ultima_letra_agregada = ""
             st.rerun()
 
-    # Botón para forzar la actualización si no escribe
-    if st.sidebar.button("🔄 Actualizar pantalla", use_container_width=True):
-        st.rerun()
+    # 🚨 EL TRUCO FINAL: RECARGA AUTOMÁTICA (POLLING) 🚨
+    # Usamos JavaScript para forzar a la página a recargarse cada 1.5 segundos
+    st.markdown("""
+        <script>
+            setTimeout(function(){
+                window.parent.location.reload();
+            }, 1500);
+        </script>
+    """, unsafe_allow_html=True)
