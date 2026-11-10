@@ -53,7 +53,6 @@ class VideoProcessor(VideoProcessorBase):
         img = cv2.flip(img, 1) # Efecto espejo
         
         if self.model is not None:
-            # Usamos la API nueva de MediaPipe
             import mediapipe as mp
             from mediapipe.tasks.python import vision
             
@@ -79,17 +78,25 @@ class VideoProcessor(VideoProcessorBase):
                     prediction = self.model.predict(np.expand_dims(features, axis=0), verbose=0)
                     predicted_class = np.argmax(prediction)
                     confidence = np.max(prediction) * 100
-                    letra = self.encoder.inverse_transform([predicted_class])[0]
                     
-                    # Dibujar en el video
-                    cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                    
-                    # Guardar en sesión de Streamlit
-                    st.session_state.letra_actual = letra
+                    # Solo mostrar la letra si la confianza es mayor al 70%
+                    if confidence > 70:
+                        letra = self.encoder.inverse_transform([predicted_class])[0]
+                        
+                        # Dibujar en el video
+                        cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        
+                        # Guardar en sesión de Streamlit
+                        st.session_state.letra_actual = letra
+                    else:
+                        cv2.putText(img, "Analizando...", (20, 50), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+                        st.session_state.letra_actual = ""
                 else:
                     cv2.putText(img, "Mano no detectada", (20, 50), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    st.session_state.letra_actual = ""
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
@@ -99,6 +106,8 @@ def render_traductor():
         st.session_state.texto = ""
     if "letra_actual" not in st.session_state:
         st.session_state.letra_actual = ""
+    if "ultima_letra_agregada" not in st.session_state:
+        st.session_state.ultima_letra_agregada = ""
 
     # Barra lateral
     with st.sidebar:
@@ -127,7 +136,7 @@ def render_traductor():
     with col1:
         st.markdown("### 📷 Cámara en vivo")
         
-        # Componente WebRTC (Video en vivo)
+        # Componente WebRTC
         webrtc_streamer(
             key="senavoz-video",
             video_processor_factory=VideoProcessor,
@@ -139,25 +148,30 @@ def render_traductor():
 
     with col2:
         st.markdown("### ✨ Traducción")
-        st.markdown('<span style="background-color: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold;">ESPAÑOL</span>', unsafe_allow_html=True)
         
         # Mostrar el texto formado
         st.markdown(f"""
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; height: 200px; margin-top: 1rem;">
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; height: 200px; margin-top: 1rem; margin-bottom: 1rem;">
             <p style="font-size: 2rem; font-weight: bold; color: #0f172a;">{st.session_state.texto}</p>
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # Botones para interactuar
+        # Lógica para agregar letra automáticamente sin repetir
         letra_actual = st.session_state.get("letra_actual", "")
-        if letra_actual:
-            if st.button(f"➕ Agregar la letra '{letra_actual}' al texto", use_container_width=True):
-                st.session_state.texto += letra_actual
-                st.session_state.letra_actual = "" # Limpiar para que no se agregue doble
-                st.rerun()
-                
+        
+        # Si hay una letra nueva y es diferente a la última que se agregó
+        if letra_actual and letra_actual != st.session_state.ultima_letra_agregada:
+            st.session_state.texto += letra_actual
+            st.session_state.ultima_letra_agregada = letra_actual
+            st.rerun() # Recargamos para actualizar la pantalla inmediatamente
+            
+        # Si no hay mano detectada, reseteamos la última letra para permitir escribir la misma letra dos veces
+        if not letra_actual:
+             st.session_state.ultima_letra_agregada = ""
+
+        # Botón para borrar texto
         if st.button("🗑️ Borrar texto", use_container_width=True):
             st.session_state.texto = ""
+            st.session_state.letra_actual = ""
+            st.session_state.ultima_letra_agregada = ""
             st.rerun()
