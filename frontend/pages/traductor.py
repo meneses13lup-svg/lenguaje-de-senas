@@ -11,11 +11,13 @@ import os
 import av
 import time
 
-# Conectar con la raíz del proyecto
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
-# Cargar el modelo
+# Diccionario global para comunicar el hilo del video con la interfaz
+if "shared_data" not in st.session_state:
+    st.session_state.shared_data = {"letra": "", "timestamp": 0.0}
+
 @st.cache_resource
 def load_model():
     model_path = Path(Config.ROOT_DIR) / "models" / "model.h5"
@@ -26,7 +28,6 @@ def load_model():
         return model, encoder
     return None, None
 
-# --- CLASE DE PROCESAMIENTO DE VIDEO EN VIVO (WEBRTC) ---
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         self.model, self.encoder = load_model()
@@ -37,9 +38,8 @@ class VideoProcessor(VideoProcessorBase):
         HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
         VisionRunningMode = mp.tasks.vision.RunningMode
         
-        self.model_path_mp = "hand_landmarker.task"
         self.options = HandLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=self.model_path_mp),
+            base_options=BaseOptions(model_asset_path="hand_landmarker.task"),
             running_mode=VisionRunningMode.VIDEO,
             num_hands=1,
             min_hand_detection_confidence=0.7
@@ -67,36 +67,27 @@ class VideoProcessor(VideoProcessorBase):
                     if max_dist > 0:
                         coords = coords / max_dist
                     
-                    features = coords.flatten()
-                    prediction = self.model.predict(np.expand_dims(features, axis=0), verbose=0)
-                    predicted_class = np.argmax(prediction)
+                    prediction = self.model.predict(np.expand_dims(coords.flatten(), axis=0), verbose=0)
                     confidence = np.max(prediction) * 100
                     
                     if confidence > 70:
-                        letra = self.encoder.inverse_transform([predicted_class])[0]
+                        letra = self.encoder.inverse_transform([np.argmax(prediction)])[0]
                         cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                        # Actualizamos la variable global de Streamlit
-                        st.session_state.letra_actual = letra
-                        st.session_state.ultimo_timestamp = time.time()
+                        
+                        # COMUNICACIÓN CON LA INTERFAZ
+                        st.session_state.shared_data["letra"] = letra
+                        st.session_state.shared_data["timestamp"] = time.time()
                     else:
-                        cv2.putText(img, "Analizando...", (20, 50), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-                        if time.time() - st.session_state.get("ultimo_timestamp", 0) > 1.0:
-                            st.session_state.letra_actual = ""
+                        cv2.putText(img, "Analizando...", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                 else:
-                    cv2.putText(img, "Mano no detectada", (20, 50), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    if time.time() - st.session_state.get("ultimo_timestamp", 0) > 1.0:
-                        st.session_state.letra_actual = ""
+                    cv2.putText(img, "Mano no detectada", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
     if "texto" not in st.session_state:
         st.session_state.texto = ""
-    if "letra_actual" not in st.session_state:
-        st.session_state.letra_actual = ""
     if "ultima_letra_agregada" not in st.session_state:
         st.session_state.ultima_letra_agregada = ""
 
@@ -116,25 +107,18 @@ def render_traductor():
             st.session_state["authentication_status"] = None
             st.rerun()
 
-    # --- CSS PARA EL DASHBOARD ---
+    # --- DISEÑO CSS ---
     st.markdown("""
     <style>
-        .title-sesion {
-            color: #06b6d4; font-weight: bold; font-size: 0.875rem; margin-bottom: 0; letter-spacing: 0.05em;
-        }
-        .title-principal {
-            margin-top: 0; font-size: 2.5rem; font-weight: 800; color: #0f172a; margin-bottom: 2rem;
-        }
         .card-traduccion {
             background: #ffffff;
             border-radius: 20px;
             padding: 30px;
             border: 1px solid #e2e8f0;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
             min-height: 350px;
             display: flex;
             flex-direction: column;
-            position: relative;
         }
         .badge-idioma {
             background-color: #f1f5f9; 
@@ -145,7 +129,6 @@ def render_traductor():
             color: #475569;
             display: inline-block;
             margin-bottom: 20px;
-            letter-spacing: 0.05em;
         }
         .texto-detectado {
             font-size: 2.8rem;
@@ -153,7 +136,6 @@ def render_traductor():
             color: #0f172a;
             line-height: 1.2;
             word-wrap: break-word;
-            font-family: 'Inter', sans-serif;
         }
         .texto-vacio {
             font-size: 2rem;
@@ -161,57 +143,45 @@ def render_traductor():
             color: #cbd5e1;
             line-height: 1.4;
         }
-        /* Estilo para el contenedor de WebRTC */
-        .stVideoProcessor > div {
-            border-radius: 16px !important;
-            overflow: hidden !important;
-        }
         button[title="View fullscreen"] { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
-    # --- CONTENIDO PRINCIPAL ---
-    st.markdown('<p class="title-sesion">SESIÓN NUEVA</p>', unsafe_allow_html=True)
-    st.markdown('<h1 class="title-principal">Comienza a comunicarte</h1>', unsafe_allow_html=True)
+    st.markdown('<p style="color: #06b6d4; font-weight: bold; font-size: 0.875rem; margin-bottom: 0;">SESIÓN NUEVA</p>', unsafe_allow_html=True)
+    st.markdown('<h1 style="margin-top: 0; font-size: 2.5rem; font-weight: 800;">Comienza a comunicarte</h1>', unsafe_allow_html=True)
 
     col1, col2 = st.columns([1.3, 1], gap="large")
 
     with col1:
         st.markdown("### 📷 Cámara en vivo")
-        
-        # Componente WebRTC
         webrtc_streamer(
             key="senavoz-video",
             video_processor_factory=VideoProcessor,
-            rtc_configuration=RTCConfiguration(
-                {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
-            ),
+            rtc_configuration=RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}),
             media_stream_constraints={"video": True, "audio": False},
         )
 
     with col2:
         st.markdown("### ✨ Traducción")
         
-        # Lógica para agregar letra automáticamente
-        letra_actual = st.session_state.get("letra_actual", "")
+        # Leer la letra desde el hilo del video
+        letra_detectada = st.session_state.shared_data.get("letra", "")
+        timestamp_letra = st.session_state.shared_data.get("timestamp", 0)
         
-        if letra_actual and letra_actual != st.session_state.ultima_letra_agregada:
-            st.session_state.texto += letra_actual
-            st.session_state.ultima_letra_agregada = letra_actual
-            st.rerun() 
-            
-        if not letra_actual:
-             st.session_state.ultima_letra_agregada = ""
+        # Lógica: Si la letra es nueva y tiene menos de 2 segundos de antigüedad, la agregamos
+        if letra_detectada and letra_detectada != st.session_state.ultima_letra_agregada:
+            st.session_state.texto += letra_detectada
+            st.session_state.ultima_letra_agregada = letra_detectada
+            st.rerun() # Fuerza a la pantalla a actualizarse
 
-        # Determinar si hay texto para mostrar
-        texto_mostrar = st.session_state.texto
-        if texto_mostrar:
-            clase_texto = "texto-detectado"
-        else:
-            texto_mostrar = "El texto aparecerá aquí..."
-            clase_texto = "texto-vacio"
+        # Si la mano no se detecta por más de 1.5 segundos, reseteamos la última letra
+        if time.time() - timestamp_letra > 1.5:
+            st.session_state.ultima_letra_agregada = ""
+
+        # Renderizar la tarjeta de texto
+        texto_mostrar = st.session_state.texto if st.session_state.texto else "El texto aparecerá aquí..."
+        clase_texto = "texto-detectado" if st.session_state.texto else "texto-vacio"
         
-        # Renderizar Tarjeta
         st.markdown(f"""
         <div class="card-traduccion">
             <div><span class="badge-idioma">ESPAÑOL</span></div>
@@ -221,9 +191,8 @@ def render_traductor():
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Botón para borrar texto
         if st.button("🗑️ Borrar texto", use_container_width=True):
             st.session_state.texto = ""
-            st.session_state.letra_actual = ""
+            st.session_state.shared_data["letra"] = ""
             st.session_state.ultima_letra_agregada = ""
             st.rerun()
