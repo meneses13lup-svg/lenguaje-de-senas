@@ -15,6 +15,7 @@ import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
+# Cargar el modelo
 @st.cache_resource
 def load_model():
     model_path = Path(Config.ROOT_DIR) / "models" / "model.h5"
@@ -31,9 +32,6 @@ class VideoProcessor(VideoProcessorBase):
         self.model, self.encoder = load_model()
         
         import mediapipe as mp
-        from mediapipe.tasks import python
-        from mediapipe.tasks.python import vision
-        
         BaseOptions = mp.tasks.BaseOptions
         HandLandmarker = mp.tasks.vision.HandLandmarker
         HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
@@ -58,7 +56,6 @@ class VideoProcessor(VideoProcessorBase):
             with vision.HandLandmarker.create_from_options(self.options) as landmarker:
                 rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_img)
-                
                 timestamp_ms = int(time.time() * 1000)
                 detection_result = landmarker.detect_for_video(mp_image, timestamp_ms)
                 
@@ -79,20 +76,23 @@ class VideoProcessor(VideoProcessorBase):
                         letra = self.encoder.inverse_transform([predicted_class])[0]
                         cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        # Actualizamos la variable global de Streamlit
                         st.session_state.letra_actual = letra
+                        st.session_state.ultimo_timestamp = time.time()
                     else:
                         cv2.putText(img, "Analizando...", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-                        st.session_state.letra_actual = ""
+                        if time.time() - st.session_state.get("ultimo_timestamp", 0) > 1.0:
+                            st.session_state.letra_actual = ""
                 else:
                     cv2.putText(img, "Mano no detectada", (20, 50), 
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    st.session_state.letra_actual = ""
+                    if time.time() - st.session_state.get("ultimo_timestamp", 0) > 1.0:
+                        st.session_state.letra_actual = ""
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
-    # Inicializar variables en sesión
     if "texto" not in st.session_state:
         st.session_state.texto = ""
     if "letra_actual" not in st.session_state:
@@ -100,7 +100,7 @@ def render_traductor():
     if "ultima_letra_agregada" not in st.session_state:
         st.session_state.ultima_letra_agregada = ""
 
-    # Barra lateral
+    # --- BARRA LATERAL ---
     with st.sidebar:
         st.markdown("""
         <div class="brand">
@@ -116,52 +116,70 @@ def render_traductor():
             st.session_state["authentication_status"] = None
             st.rerun()
 
-    # Contenido principal
-    st.markdown("""
-        <p style="color: #06b6d4; font-weight: bold; font-size: 0.875rem; margin-bottom: 0;">SESIÓN NUEVA</p>
-        <h1 style="margin-top: 0;">Comienza a comunicarte</h1>
-    """, unsafe_allow_html=True)
-
-    # --- CSS PARA MEJORAR EL DISEÑO DEL DASHBOARD ---
+    # --- CSS PARA EL DASHBOARD ---
     st.markdown("""
     <style>
-        .camara-card {
-            background: white;
-            border-radius: 16px;
-            padding: 16px;
-            border: 2px solid #06b6d4;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            margin-bottom: 20px;
+        .title-sesion {
+            color: #06b6d4; font-weight: bold; font-size: 0.875rem; margin-bottom: 0; letter-spacing: 0.05em;
         }
-        .traduccion-card {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
+        .title-principal {
+            margin-top: 0; font-size: 2.5rem; font-weight: 800; color: #0f172a; margin-bottom: 2rem;
+        }
+        .card-traduccion {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 30px;
             border: 1px solid #e2e8f0;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            min-height: 300px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            min-height: 350px;
             display: flex;
             flex-direction: column;
+            position: relative;
         }
-        .texto-traducido {
-            font-size: 2.5rem;
+        .badge-idioma {
+            background-color: #f1f5f9; 
+            padding: 6px 12px; 
+            border-radius: 6px; 
+            font-size: 0.75rem; 
+            font-weight: 700; 
+            color: #475569;
+            display: inline-block;
+            margin-bottom: 20px;
+            letter-spacing: 0.05em;
+        }
+        .texto-detectado {
+            font-size: 2.8rem;
             font-weight: 800;
             color: #0f172a;
             line-height: 1.2;
             word-wrap: break-word;
+            font-family: 'Inter', sans-serif;
+        }
+        .texto-vacio {
+            font-size: 2rem;
+            font-weight: 500;
+            color: #cbd5e1;
+            line-height: 1.4;
+        }
+        /* Estilo para el contenedor de WebRTC */
+        .stVideoProcessor > div {
+            border-radius: 16px !important;
+            overflow: hidden !important;
         }
         button[title="View fullscreen"] { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
-    col1, col2 = st.columns([1.5, 1], gap="large")
+    # --- CONTENIDO PRINCIPAL ---
+    st.markdown('<p class="title-sesion">SESIÓN NUEVA</p>', unsafe_allow_html=True)
+    st.markdown('<h1 class="title-principal">Comienza a comunicarte</h1>', unsafe_allow_html=True)
+
+    col1, col2 = st.columns([1.3, 1], gap="large")
 
     with col1:
-        st.markdown("### 📷 Vista de cámara")
+        st.markdown("### 📷 Cámara en vivo")
         
-        # Envolver el video en el contenedor con clase CSS
-        st.markdown('<div class="camara-card">', unsafe_allow_html=True)
-        
+        # Componente WebRTC
         webrtc_streamer(
             key="senavoz-video",
             video_processor_factory=VideoProcessor,
@@ -170,7 +188,6 @@ def render_traductor():
             ),
             media_stream_constraints={"video": True, "audio": False},
         )
-        st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
         st.markdown("### ✨ Traducción")
@@ -186,18 +203,19 @@ def render_traductor():
         if not letra_actual:
              st.session_state.ultima_letra_agregada = ""
 
-        # Renderizar la tarjeta de traducción
-        texto_actual = st.session_state.texto if st.session_state.texto else "El texto aparecerá aquí..."
-        color_texto = "#0f172a" if st.session_state.texto else "#94a3b8"
+        # Determinar si hay texto para mostrar
+        texto_mostrar = st.session_state.texto
+        if texto_mostrar:
+            clase_texto = "texto-detectado"
+        else:
+            texto_mostrar = "El texto aparecerá aquí..."
+            clase_texto = "texto-vacio"
         
+        # Renderizar Tarjeta
         st.markdown(f"""
-        <div class="traduccion-card">
-            <div style="margin-bottom: 10px;">
-                <span style="background-color: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; color: #475569;">ESPAÑOL</span>
-            </div>
-            <div class="texto-traducido" style="color: {color_texto};">
-                {texto_actual}
-            </div>
+        <div class="card-traduccion">
+            <div><span class="badge-idioma">ESPAÑOL</span></div>
+            <div class="{clase_texto}">{texto_mostrar}</div>
         </div>
         """, unsafe_allow_html=True)
         
