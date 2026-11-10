@@ -30,7 +30,6 @@ class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         self.model, self.encoder = load_model()
         
-        # Importaciones DENTRO de la clase para evitar errores en hilos de WebRTC
         import mediapipe as mp
         from mediapipe.tasks import python
         from mediapipe.tasks.python import vision
@@ -50,7 +49,7 @@ class VideoProcessor(VideoProcessorBase):
 
     def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
-        img = cv2.flip(img, 1) # Efecto espejo
+        img = cv2.flip(img, 1)
         
         if self.model is not None:
             import mediapipe as mp
@@ -60,34 +59,26 @@ class VideoProcessor(VideoProcessorBase):
                 rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_img)
                 
-                # Timestamp requerido para VIDEO
                 timestamp_ms = int(time.time() * 1000)
                 detection_result = landmarker.detect_for_video(mp_image, timestamp_ms)
                 
                 if detection_result.hand_landmarks:
                     landmarks = detection_result.hand_landmarks[0]
-                    # Extraer y normalizar coordenadas
                     coords = np.array([[lm.x, lm.y, lm.z] for lm in landmarks])
-                    coords = coords - coords[0] # Centrar en la muñeca
+                    coords = coords - coords[0]
                     max_dist = np.max(np.linalg.norm(coords, axis=1))
                     if max_dist > 0:
                         coords = coords / max_dist
                     
                     features = coords.flatten()
-                    # Predecir
                     prediction = self.model.predict(np.expand_dims(features, axis=0), verbose=0)
                     predicted_class = np.argmax(prediction)
                     confidence = np.max(prediction) * 100
                     
-                    # Solo mostrar la letra si la confianza es mayor al 70%
                     if confidence > 70:
                         letra = self.encoder.inverse_transform([predicted_class])[0]
-                        
-                        # Dibujar en el video
                         cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                        
-                        # Guardar en sesión de Streamlit
                         st.session_state.letra_actual = letra
                     else:
                         cv2.putText(img, "Analizando...", (20, 50), 
@@ -131,12 +122,46 @@ def render_traductor():
         <h1 style="margin-top: 0;">Comienza a comunicarte</h1>
     """, unsafe_allow_html=True)
 
-    col1, col2 = st.columns([1.5, 1])
+    # --- CSS PARA MEJORAR EL DISEÑO DEL DASHBOARD ---
+    st.markdown("""
+    <style>
+        .camara-card {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+            border: 2px solid #06b6d4;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .traduccion-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+        .texto-traducido {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.2;
+            word-wrap: break-word;
+        }
+        button[title="View fullscreen"] { display: none; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2 = st.columns([1.5, 1], gap="large")
 
     with col1:
-        st.markdown("### 📷 Cámara en vivo")
+        st.markdown("### 📷 Vista de cámara")
         
-        # Componente WebRTC
+        # Envolver el video en el contenedor con clase CSS
+        st.markdown('<div class="camara-card">', unsafe_allow_html=True)
+        
         webrtc_streamer(
             key="senavoz-video",
             video_processor_factory=VideoProcessor,
@@ -145,29 +170,38 @@ def render_traductor():
             ),
             media_stream_constraints={"video": True, "audio": False},
         )
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
         st.markdown("### ✨ Traducción")
         
-        # Mostrar el texto formado
-        st.markdown(f"""
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; height: 200px; margin-top: 1rem; margin-bottom: 1rem;">
-            <p style="font-size: 2rem; font-weight: bold; color: #0f172a;">{st.session_state.texto}</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Lógica para agregar letra automáticamente sin repetir
+        # Lógica para agregar letra automáticamente
         letra_actual = st.session_state.get("letra_actual", "")
         
-        # Si hay una letra nueva y es diferente a la última que se agregó
         if letra_actual and letra_actual != st.session_state.ultima_letra_agregada:
             st.session_state.texto += letra_actual
             st.session_state.ultima_letra_agregada = letra_actual
-            st.rerun() # Recargamos para actualizar la pantalla inmediatamente
+            st.rerun() 
             
-        # Si no hay mano detectada, reseteamos la última letra para permitir escribir la misma letra dos veces
         if not letra_actual:
              st.session_state.ultima_letra_agregada = ""
+
+        # Renderizar la tarjeta de traducción
+        texto_actual = st.session_state.texto if st.session_state.texto else "El texto aparecerá aquí..."
+        color_texto = "#0f172a" if st.session_state.texto else "#94a3b8"
+        
+        st.markdown(f"""
+        <div class="traduccion-card">
+            <div style="margin-bottom: 10px;">
+                <span style="background-color: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; color: #475569;">ESPAÑOL</span>
+            </div>
+            <div class="texto-traducido" style="color: {color_texto};">
+                {texto_actual}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
 
         # Botón para borrar texto
         if st.button("🗑️ Borrar texto", use_container_width=True):
