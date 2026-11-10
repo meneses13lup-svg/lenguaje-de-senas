@@ -15,9 +15,11 @@ import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
-# Inicializar shared_data de forma global para evitar errores en WebRTC
-if "shared_data" not in st.session_state:
-    st.session_state.shared_data = {"letra": "", "timestamp": 0.0}
+# Variables globales
+if "texto" not in st.session_state:
+    st.session_state.texto = ""
+if "letra_detectada" not in st.session_state:
+    st.session_state.letra_detectada = ""
 
 @st.cache_resource
 def load_model():
@@ -29,14 +31,9 @@ def load_model():
         return model, encoder
     return None, None
 
-# --- CLASE DE PROCESAMIENTO DE VIDEO EN VIVO (WEBRTC) ---
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         self.model, self.encoder = load_model()
-        
-        # Nos aseguramos de que shared_data exista en el hilo del video
-        if "shared_data" not in st.session_state:
-            st.session_state.shared_data = {"letra": "", "timestamp": 0.0}
         
         import mediapipe as mp
         BaseOptions = mp.tasks.BaseOptions
@@ -44,9 +41,8 @@ class VideoProcessor(VideoProcessorBase):
         HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
         VisionRunningMode = mp.tasks.vision.RunningMode
         
-        self.model_path_mp = "hand_landmarker.task"
         self.options = HandLandmarkerOptions(
-            base_options=BaseOptions(model_asset_path=self.model_path_mp),
+            base_options=BaseOptions(model_asset_path="hand_landmarker.task"),
             running_mode=VisionRunningMode.VIDEO,
             num_hands=1,
             min_hand_detection_confidence=0.7
@@ -74,8 +70,7 @@ class VideoProcessor(VideoProcessorBase):
                     if max_dist > 0:
                         coords = coords / max_dist
                     
-                    features = coords.flatten()
-                    prediction = self.model.predict(np.expand_dims(features, axis=0), verbose=0)
+                    prediction = self.model.predict(np.expand_dims(coords.flatten(), axis=0), verbose=0)
                     confidence = np.max(prediction) * 100
                     
                     if confidence > 70:
@@ -83,127 +78,180 @@ class VideoProcessor(VideoProcessorBase):
                         cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                         
-                        # Guardar de forma segura
-                        st.session_state.shared_data["letra"] = letra
-                        st.session_state.shared_data["timestamp"] = time.time()
+                        # Guardamos en la sesión global
+                        st.session_state.letra_detectada = letra
                     else:
                         cv2.putText(img, "Analizando...", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                 else:
                     cv2.putText(img, "Mano no detectada", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    st.session_state.letra_detectada = ""
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
-    # Inicializar variables en sesión
-    if "texto" not in st.session_state:
-        st.session_state.texto = ""
-    if "ultima_letra_agregada" not in st.session_state:
-        st.session_state.ultima_letra_agregada = ""
-    if "shared_data" not in st.session_state:
-        st.session_state.shared_data = {"letra": "", "timestamp": 0.0}
+    # --- DISEÑO CSS PREMIUM ---
+    st.markdown("""
+    <style>
+        /* Ocultar el menú de Streamlit y el pie de página */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        
+        /* Panel de traducción estilo Neón/Oscuro */
+        .panel-traduccion {
+            background: linear-gradient(145deg, #0f172a, #1e293b);
+            border-radius: 24px;
+            padding: 30px;
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1);
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid #334155;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Efecto de luz brillante en la esquina */
+        .panel-traduccion::before {
+            content: '';
+            position: absolute;
+            top: -50px; right: -50px;
+            width: 150px; height: 150px;
+            background: #06b6d4;
+            filter: blur(80px);
+            opacity: 0.2;
+            border-radius: 50%;
+        }
+
+        .badge-idioma {
+            background-color: rgba(6, 182, 212, 0.15);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: #22d3ee;
+            display: inline-block;
+            margin-bottom: 25px;
+            letter-spacing: 0.1em;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.2);
+        }
+
+        .texto-traducido {
+            font-size: 3.5rem;
+            font-weight: 900;
+            line-height: 1.1;
+            font-family: 'Inter', sans-serif;
+            word-wrap: break-word;
+            z-index: 10;
+            color: #ffffff;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        .texto-vacio {
+            font-size: 2rem;
+            font-weight: 500;
+            color: #64748b;
+            line-height: 1.4;
+            z-index: 10;
+            font-style: italic;
+        }
+
+        .letra-detectada-badge {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: #06b6d4;
+            color: #0f172a;
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: 900;
+            font-size: 1.5rem;
+            box-shadow: 0 0 20px rgba(6,182,212,0.5);
+        }
+        
+        /* Mejorar el aspecto del contenedor del video */
+        .stVideoProcessor {
+            border-radius: 20px;
+            overflow: hidden;
+            border: 2px solid #1e293b;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
     # --- BARRA LATERAL ---
     with st.sidebar:
         st.markdown("""
-        <div class="brand">
-            <div class="brand-icon">🤟</div>
-            <div class="brand-text">
-                <h2>Seña<span>Voz</span></h2>
-                <p>Comunicación sin límites</p>
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 30px;">
+            <div style="background: #06b6d4; width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 0 15px rgba(6,182,212,0.4);">🤟</div>
+            <div>
+                <h2 style="margin: 0; color: #0f172a; font-size: 1.4rem; font-weight: 800;">Seña<span style="color: #06b6d4;">Voz</span></h2>
+                <p style="margin: 0; color: #64748b; font-size: 0.65rem; letter-spacing: 0.1em; font-weight: 700;">SIN LÍMITES</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
+        
         st.markdown("---")
-        if st.button("Cerrar sesión", use_container_width=True):
+        if st.button("🚪 Cerrar sesión", use_container_width=True):
             st.session_state["authentication_status"] = None
             st.rerun()
 
-    # --- DISEÑO CSS ---
+    # --- CONTENIDO PRINCIPAL ---
     st.markdown("""
-    <style>
-        .card-traduccion {
-            background: #ffffff;
-            border-radius: 20px;
-            padding: 30px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
-            min-height: 350px;
-            display: flex;
-            flex-direction: column;
-        }
-        .badge-idioma {
-            background-color: #f1f5f9; 
-            padding: 6px 12px; 
-            border-radius: 6px; 
-            font-size: 0.75rem; 
-            font-weight: 700; 
-            color: #475569;
-            display: inline-block;
-            margin-bottom: 20px;
-        }
-        .texto-detectado {
-            font-size: 2.8rem;
-            font-weight: 800;
-            color: #0f172a;
-            line-height: 1.2;
-            word-wrap: break-word;
-        }
-        .texto-vacio {
-            font-size: 2rem;
-            font-weight: 500;
-            color: #cbd5e1;
-            line-height: 1.4;
-        }
-        button[title="View fullscreen"] { display: none; }
-    </style>
+        <p style="color: #06b6d4; font-weight: 800; font-size: 0.85rem; margin-bottom: 5px; letter-spacing: 0.1em;">SESIÓN NUEVA</p>
+        <h1 style="margin-top: 0; font-size: 2.8rem; font-weight: 900; color: #0f172a; letter-spacing: -0.02em; margin-bottom: 2rem;">Comienza a comunicarte</h1>
     """, unsafe_allow_html=True)
 
-    st.markdown('<p style="color: #06b6d4; font-weight: bold; font-size: 0.875rem; margin-bottom: 0;">SESIÓN NUEVA</p>', unsafe_allow_html=True)
-    st.markdown('<h1 style="margin-top: 0; font-size: 2.5rem; font-weight: 800;">Comienza a comunicarte</h1>', unsafe_allow_html=True)
+    col1, col2 = st.columns([1.2, 1], gap="large")
 
-    col1, col2 = st.columns([1.3, 1], gap="large")
-
+    # --- COLUMNA IZQUIERDA: CÁMARA ---
     with col1:
         st.markdown("### 📷 Cámara en vivo")
-        webrtc_streamer(
-            key="senavoz-video",
-            video_processor_factory=VideoProcessor,
-            rtc_configuration=RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}),
-            media_stream_constraints={"video": True, "audio": False},
-        )
+        
+        # Usamos un contenedor para que WebRTC se vea bien
+        with st.container():
+            webrtc_streamer(
+                key="senavoz-video",
+                video_processor_factory=VideoProcessor,
+                rtc_configuration=RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}),
+                media_stream_constraints={"video": True, "audio": False},
+            )
 
+    # --- COLUMNA DERECHA: TRADUCCIÓN ---
     with col2:
         st.markdown("### ✨ Traducción")
         
-        # Leer la letra desde el hilo del video
-        letra_detectada = st.session_state.shared_data.get("letra", "")
-        timestamp_letra = st.session_state.shared_data.get("timestamp", 0)
+        # Lógica para agregar letra automáticamente
+        letra = st.session_state.get("letra_detectada", "")
         
-        # Lógica: Si la letra es nueva y tiene menos de 2 segundos de antigüedad, la agregamos
-        if letra_detectada and letra_detectada != st.session_state.ultima_letra_agregada:
-            st.session_state.texto += letra_detectada
-            st.session_state.ultima_letra_agregada = letra_detectada
-            st.rerun() # Fuerza a la pantalla a actualizarse
+        # Si la letra cambió y es válida, la agregamos al texto
+        if letra and letra != st.session_state.get("ultima_letra", ""):
+            st.session_state.texto += letra
+            st.session_state.ultima_letra = letra
+            st.rerun() # Recarga la pantalla para mostrar el nuevo texto
+        
+        # Si no hay letra, reseteamos el bloqueo para permitir escribir la misma letra otra vez
+        if not letra:
+            st.session_state.ultima_letra = ""
 
-        # Si la mano no se detecta por más de 1.5 segundos, reseteamos la última letra
-        if time.time() - timestamp_letra > 1.5:
-            st.session_state.ultima_letra_agregada = ""
-
-        # Renderizar la tarjeta de texto
+        # Determinar qué mostrar
         texto_mostrar = st.session_state.texto if st.session_state.texto else "El texto aparecerá aquí..."
-        clase_texto = "texto-detectado" if st.session_state.texto else "texto-vacio"
+        clase_texto = "texto-traducido" if st.session_state.texto else "texto-vacio"
         
+        # HTML del panel con el diseño bonito
         st.markdown(f"""
-        <div class="card-traduccion">
+        <div class="panel-traduccion">
             <div><span class="badge-idioma">ESPAÑOL</span></div>
             <div class="{clase_texto}">{texto_mostrar}</div>
+            {f'<div class="letra-detectada-badge">Última letra: {letra}</div>' if letra else ''}
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-        if st.button("🗑️ Borrar texto", use_container_width=True):
+        # Botón para borrar texto
+        if st.button("🗑️ Borrar todo el texto", use_container_width=True, type="primary"):
             st.session_state.texto = ""
-            st.session_state.shared_data["letra"] = ""
-            st.session_state.ultima_letra_agregada = ""
+            st.session_state.letra_detectada = ""
+            st.session_state.ultima_letra = ""
             st.rerun()
