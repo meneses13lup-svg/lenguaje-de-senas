@@ -14,11 +14,13 @@ import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
-# Variables de sesión
+# 1. El archivo donde la cámara escribirá la letra
+ARCHIVO_LETRA = "letra_actual.txt"
+
 if "texto" not in st.session_state:
     st.session_state.texto = ""
-if "letra_actual" not in st.session_state:
-    st.session_state.letra_actual = ""
+if "ultima_letra" not in st.session_state:
+    st.session_state.ultima_letra = ""
 
 @st.cache_resource
 def load_model():
@@ -76,8 +78,13 @@ class VideoProcessor(VideoProcessorBase):
                         letra = self.encoder.inverse_transform([np.argmax(prediction)])[0]
                         cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                        # Guardamos en la sesión de Streamlit (esto SÍ funciona en el hilo de la app)
-                        st.session_state.letra_actual = letra
+                        
+                        # 2. ESCRIBIR LA LETRA EN EL ARCHIVO DE TEXTO
+                        try:
+                            with open(ARCHIVO_LETRA, "w") as f:
+                                f.write(letra)
+                        except:
+                            pass
                     else:
                         cv2.putText(img, "Analizando...", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                 else:
@@ -92,7 +99,6 @@ def render_traductor():
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         .stApp { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); }
-        
         .panel-traduccion {
             background: linear-gradient(145deg, #0f172a, #1e293b);
             border-radius: 24px;
@@ -126,32 +132,12 @@ def render_traductor():
             display: inline-block;
             margin-bottom: 25px;
         }
-        .texto-traducido {
-            font-size: 3.5rem;
-            font-weight: 900;
-            line-height: 1.1;
-            color: #ffffff;
-        }
-        .texto-vacio {
-            font-size: 2rem;
-            font-weight: 500;
-            color: #64748b;
-        }
-        .letra-detectada-badge {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: #06b6d4;
-            color: #0f172a;
-            padding: 10px 20px;
-            border-radius: 12px;
-            font-weight: 900;
-            font-size: 1.5rem;
-        }
+        .texto-traducido { font-size: 3.5rem; font-weight: 900; line-height: 1.1; color: #ffffff; }
+        .texto-vacio { font-size: 2rem; font-weight: 500; color: #64748b; }
     </style>
     """, unsafe_allow_html=True)
 
-    # --- HEADER CON CERRAR SESIÓN ---
+    # --- HEADER ---
     col_header1, col_header2 = st.columns([3, 1])
     with col_header1:
         st.markdown('<h2 style="margin:0; font-weight: 900; color:#0f172a;">Traductor en vivo</h2>', unsafe_allow_html=True)
@@ -160,8 +146,7 @@ def render_traductor():
             st.session_state["authentication_status"] = None
             st.rerun()
 
-    st.markdown('<p style="color: #06b6d4; font-weight: 800; font-size: 0.85rem; letter-spacing: 0.1em;">SESIÓN NUEVA</p>', unsafe_allow_html=True)
-    st.markdown('<h1 style="margin-top: 0; font-size: 2.8rem; font-weight: 900; color: #0f172a;">Comienza a comunicarte</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 style="margin-top: 1rem; font-size: 2.8rem; font-weight: 900; color: #0f172a;">Comienza a comunicarte</h1>', unsafe_allow_html=True)
 
     col1, col2 = st.columns([1.2, 1], gap="large")
 
@@ -177,14 +162,20 @@ def render_traductor():
     with col2:
         st.markdown("### ✨ Traducción")
         
-        # LÓGICA SIMPLE Y EFECTIVA
-        letra = st.session_state.get("letra_actual", "")
-        
-        # Si hay una letra nueva, la agregamos al texto
-        if letra:
-            if not st.session_state.texto.endswith(letra):
-                st.session_state.texto += letra
-                st.session_state.letra_actual = "" # Limpiamos para que no se repita
+        # 3. LEER LA LETRA DEL ARCHIVO CUANDO SE PRESIONA EL BOTÓN
+        if st.button("🔄 Capturar Letra", use_container_width=True, type="primary"):
+            try:
+                if os.path.exists(ARCHIVO_LETRA):
+                    with open(ARCHIVO_LETRA, "r") as f:
+                        letra_leida = f.read().strip()
+                        if letra_leida:
+                            st.session_state.texto += letra_leida
+                            st.session_state.ultima_letra = letra_leida
+                            # Borramos el archivo para que no se repita la letra
+                            os.remove(ARCHIVO_LETRA)
+                            st.rerun()
+            except Exception as e:
+                st.error(f"Error al leer: {e}")
 
         texto_mostrar = st.session_state.texto if st.session_state.texto else "El texto aparecerá aquí..."
         clase_texto = "texto-traducido" if st.session_state.texto else "texto-vacio"
@@ -198,13 +189,9 @@ def render_traductor():
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # BOTÓN DE ACTUALIZACIÓN MANUAL (El truco para que funcione en la nube)
-        col_b1, col_b2 = st.columns(2)
-        with col_b1:
-            if st.button("🔄 Actualizar Texto", use_container_width=True, type="primary"):
-                st.rerun()
-        with col_b2:
-            if st.button("🗑️ Borrar Texto", use_container_width=True):
-                st.session_state.texto = ""
-                st.session_state.letra_actual = ""
-                st.rerun()
+        if st.button("🗑️ Borrar todo el texto", use_container_width=True):
+            st.session_state.texto = ""
+            st.session_state.ultima_letra = ""
+            if os.path.exists(ARCHIVO_LETRA):
+                os.remove(ARCHIVO_LETRA)
+            st.rerun()
