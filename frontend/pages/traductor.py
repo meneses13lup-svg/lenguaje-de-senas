@@ -14,9 +14,16 @@ import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
+# Archivo temporal para guardar la letra detectada
 ARCHIVO_LETRA = "letra_actual.txt"
 
-@st.cache_resource
+# Inicializar variables de sesión a prueba de balas
+if "texto" not in st.session_state:
+    st.session_state.texto = ""
+if "letra_actual" not in st.session_state:
+    st.session_state.letra_actual = ""
+
+@st.cache_resource(show_spinner="🧠 Cargando modelo de Inteligencia Artificial...")
 def load_model():
     model_path = Path(Config.ROOT_DIR) / "models" / "model.h5"
     labels_path = Path(Config.ROOT_DIR) / "models" / "labels.pkl"
@@ -85,14 +92,6 @@ class VideoProcessor(VideoProcessorBase):
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
-    # 🚨 INICIALIZACIÓN A PRUEBA DE BALAS (Esto arregla el error del celular)
-    if "texto" not in st.session_state:
-        st.session_state.texto = ""
-    if "letra_actual" not in st.session_state:
-        st.session_state.letra_actual = ""
-    if "ultima_letra_agregada" not in st.session_state:
-        st.session_state.ultima_letra_agregada = ""
-
     # --- DISEÑO CSS ---
     st.markdown("""
     <style>
