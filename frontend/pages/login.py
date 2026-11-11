@@ -3,7 +3,7 @@ from backend.auth.authenticator import registrar_usuario_yaml
 
 def render_login(authenticator):
     # 1. Abrir el contenedor principal
-    st.markdown('<div class="login-container">', unsafe_allow_html=True)
+    st.html('<div class="login-container">')
     
     # 2. Crear las dos columnas (Izquierda oscura, Derecha formulario)
     col_left, col_right = st.columns([1.05, 0.95], gap="large")
@@ -39,7 +39,7 @@ def render_login(authenticator):
             </div>
         </div>
         """
-        st.markdown(html_izq, unsafe_allow_html=True)
+        st.html(html_izq)
 
     # ==================== PANEL DERECHO ====================
     with col_right:
@@ -50,7 +50,7 @@ def render_login(authenticator):
             <p class="login-subtitle">Ingresa tus datos para acceder a tu espacio de traducción.</p>
         </div>
         """
-        st.markdown(html_der, unsafe_allow_html=True)
+        st.html(html_der)
 
         # Creamos dos pestañas: Iniciar Sesión y Crear Cuenta
         tab1, tab2 = st.tabs(["Iniciar Sesión", "Crear Cuenta"])
@@ -94,10 +94,10 @@ def render_login(authenticator):
                             st.error(f"❌ {mensaje}")
 
         # Textos de la parte de abajo del formulario
-        st.markdown("""
-        <div class="divider">ACCESO SEGURO</div>
-        <p class="secure-message">🔒 Tu información está protegida y cifrada.</p>
-        """, unsafe_allow_html=True)
+    st.html("""
+<div class="divider">ACCESO SEGURO</div>
+<p class="secure-message">🔒 Tu información está protegida y cifrada.</p>
+""")
 
     # 3. Cerrar el contenedor principal
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.html('</div>')
