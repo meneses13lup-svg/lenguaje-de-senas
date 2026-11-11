@@ -86,7 +86,7 @@ class VideoProcessor(VideoProcessorBase):
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
-    # INICIALIZACIÓN A PRUEBA DE BALAS (Al principio de todo)
+    # INICIALIZACIÓN A PRUEBA DE BALAS
     if "texto" not in st.session_state:
         st.session_state.texto = ""
     if "ultima_letra" not in st.session_state:
@@ -141,10 +141,21 @@ def render_traductor():
 
     with col1:
         st.markdown("### 📷 Cámara en vivo")
+        
+        # --- CONFIGURACIÓN MULTI-STUN PARA EL CELULAR ---
         webrtc_streamer(
             key="senavoz-video",
             video_processor_factory=VideoProcessor,
-            rtc_configuration=RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}),
+            rtc_configuration=RTCConfiguration({
+                "iceServers": [
+                    {"urls": ["stun:stun.l.google.com:19302"]},
+                    {"urls": ["stun:stun1.l.google.com:19302"]},
+                    {"urls": ["stun:stun2.l.google.com:19302"]},
+                    {"urls": ["stun:stun3.l.google.com:19302"]},
+                    {"urls": ["stun:stun4.l.google.com:19302"]},
+                    {"urls": ["stun:stun.services.mozilla.com"]}
+                ]
+            }),
             media_stream_constraints={"video": True, "audio": False},
         )
 
@@ -165,7 +176,6 @@ def render_traductor():
             except Exception as e:
                 st.error(f"Error al leer: {e}")
 
-        # Inicialización forzada aquí también para evitar errores si se borra la sesión
         if "texto" not in st.session_state:
             st.session_state.texto = ""
 
