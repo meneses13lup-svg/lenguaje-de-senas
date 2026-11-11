@@ -14,7 +14,13 @@ import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
+# 1. El archivo donde la cámara escribirá la letra
 ARCHIVO_LETRA = "letra_actual.txt"
+
+if "texto" not in st.session_state:
+    st.session_state.texto = ""
+if "ultima_letra" not in st.session_state:
+    st.session_state.ultima_letra = ""
 
 @st.cache_resource
 def load_model():
@@ -72,6 +78,8 @@ class VideoProcessor(VideoProcessorBase):
                         letra = self.encoder.inverse_transform([np.argmax(prediction)])[0]
                         cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        
+                        # 2. ESCRIBIR LA LETRA EN EL ARCHIVO DE TEXTO
                         try:
                             with open(ARCHIVO_LETRA, "w") as f:
                                 f.write(letra)
@@ -85,14 +93,6 @@ class VideoProcessor(VideoProcessorBase):
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
-    # 🚨 INICIALIZACIÓN A PRUEBA DE BALAS (Esto arregla el error del celular)
-    if "texto" not in st.session_state:
-        st.session_state.texto = ""
-    if "letra_actual" not in st.session_state:
-        st.session_state.letra_actual = ""
-    if "ultima_letra_agregada" not in st.session_state:
-        st.session_state.ultima_letra_agregada = ""
-
     # --- DISEÑO CSS ---
     st.markdown("""
     <style>
@@ -162,6 +162,7 @@ def render_traductor():
     with col2:
         st.markdown("### ✨ Traducción")
         
+        # 3. LEER LA LETRA DEL ARCHIVO CUANDO SE PRESIONA EL BOTÓN
         if st.button("🔄 Capturar Letra", use_container_width=True, type="primary"):
             try:
                 if os.path.exists(ARCHIVO_LETRA):
@@ -169,10 +170,12 @@ def render_traductor():
                         letra_leida = f.read().strip()
                         if letra_leida:
                             st.session_state.texto += letra_leida
+                            st.session_state.ultima_letra = letra_leida
+                            # Borramos el archivo para que no se repita la letra
                             os.remove(ARCHIVO_LETRA)
                             st.rerun()
             except Exception as e:
-                pass
+                st.error(f"Error al leer: {e}")
 
         texto_mostrar = st.session_state.texto if st.session_state.texto else "El texto aparecerá aquí..."
         clase_texto = "texto-traducido" if st.session_state.texto else "texto-vacio"
@@ -188,6 +191,7 @@ def render_traductor():
 
         if st.button("🗑️ Borrar todo el texto", use_container_width=True):
             st.session_state.texto = ""
+            st.session_state.ultima_letra = ""
             if os.path.exists(ARCHIVO_LETRA):
                 os.remove(ARCHIVO_LETRA)
             st.rerun()
