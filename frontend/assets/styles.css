@@ -166,3 +166,24 @@ header { visibility: hidden; }
 .divider { display: flex; align-items: center; gap: 1rem; margin: 2rem 0; color: var(--text-400); font-size: 0.75rem; font-weight: 600; }
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border-200); }
 .secure-message { text-align: center; color: var(--text-400); font-size: 0.75rem; }
+
+/* ============================================================
+   ELIMINAR EL CUADRO BLANCO FEO DE STREAMLIT
+   ============================================================ */
+[data-testid="stMarkdownContainer"] {
+    background: transparent !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Eliminar contenedores verticales vacíos que Streamlit dibuja por error */
+[data-testid="stVerticalBlock"] > div:empty {
+    display: none !important;
+}
+
+/* Ajustar el margen superior para que no quede espacio en blanco */
+.block-container {
+    padding-top: 1rem !important;
+    margin-top: 0 !important;
+}
