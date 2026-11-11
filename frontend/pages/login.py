@@ -2,10 +2,10 @@ import streamlit as st
 from backend.auth.authenticator import registrar_usuario_yaml
 
 def render_login(authenticator):
-    # 1. Abrir el contenedor principal
-    st.html('<div class="login-container">')
+    # 1. Contenedor principal con diseño de tarjeta
+    st.markdown('<div class="login-container">', unsafe_allow_html=True)
     
-    # 2. Crear las dos columnas (Izquierda oscura, Derecha formulario)
+    # 2. Columnas
     col_left, col_right = st.columns([1.05, 0.95], gap="large")
 
     # ==================== PANEL IZQUIERDO ====================
@@ -39,7 +39,7 @@ def render_login(authenticator):
             </div>
         </div>
         """
-        st.html(html_izq)
+        st.markdown(html_izq, unsafe_allow_html=True)
 
     # ==================== PANEL DERECHO ====================
     with col_right:
@@ -50,13 +50,11 @@ def render_login(authenticator):
             <p class="login-subtitle">Ingresa tus datos para acceder a tu espacio de traducción.</p>
         </div>
         """
-        st.html(html_der)
+        st.markdown(html_der, unsafe_allow_html=True)
 
-        # Creamos dos pestañas: Iniciar Sesión y Crear Cuenta
         tab1, tab2 = st.tabs(["Iniciar Sesión", "Crear Cuenta"])
 
         with tab1:
-            # Formulario de Login (Librería original)
             authenticator.login(
                 location="main",
                 fields={
@@ -71,7 +69,6 @@ def render_login(authenticator):
                 st.error("❌ Correo o contraseña incorrectos.")
 
         with tab2:
-            # Formulario de Registro manual (Guardado en YAML)
             with st.form("registro_form", clear_on_submit=True):
                 new_email = st.text_input("Correo electrónico")
                 new_name = st.text_input("Nombre completo")
@@ -86,18 +83,16 @@ def render_login(authenticator):
                     elif new_pass != new_pass2:
                         st.error("❌ Las contraseñas no coinciden.")
                     else:
-                        # Llamamos a la función que guarda en el YAML
                         exito, mensaje = registrar_usuario_yaml(new_email, new_name, new_pass)
                         if exito:
                             st.success(f"✅ {mensaje} Ahora puedes iniciar sesión en la pestaña 'Iniciar Sesión'.")
                         else:
                             st.error(f"❌ {mensaje}")
 
-        # Textos de la parte de abajo del formulario
-    st.html("""
-<div class="divider">ACCESO SEGURO</div>
-<p class="secure-message">🔒 Tu información está protegida y cifrada.</p>
-""")
+        st.markdown("""
+        <div class="divider">ACCESO SEGURO</div>
+        <p class="secure-message">🔒 Tu información está protegida y cifrada.</p>
+        """, unsafe_allow_html=True)
 
-    # 3. Cerrar el contenedor principal
-    st.html('</div>')
+    # 3. Cerramos el contenedor
+    st.markdown('</div>', unsafe_allow_html=True)

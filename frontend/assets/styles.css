@@ -1,5 +1,5 @@
 /* ============================================================
-   SeñaVoz — Estilos globales (Versión Final)
+   SeñaVoz — Estilos globales (Versión Final Corregida)
    ============================================================ */
 
 :root {
@@ -39,25 +39,31 @@ footer { visibility: hidden; }
 header { visibility: hidden; }
 [data-testid="stToolbar"] { display: none; }
 
-/* 2. Ajustar el contenedor principal para que ocupe toda la pantalla */
+/* 2. Ajustar el contenedor principal */
 .block-container { 
-    padding-top: 2rem !important; 
-    padding-bottom: 2rem !important; 
-    max-width: 95% !important; 
+    padding-top: 0rem !important; 
+    padding-bottom: 0rem !important; 
+    max-width: 100% !important; 
 }
 
-/* 3. EL TRUCO: Evitar que Streamlit haga cajas de código feas */
+/* Fondo de la app */
+.stApp { 
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); 
+}
+
+/* 3. Evitar cajas de código feas */
 [data-testid="stMarkdownContainer"] {
     background: transparent !important;
     padding: 0 !important;
     border: none !important;
 }
-.stApp { background-color: var(--slate-50); }
 
-/* 4. Contenedor del Login */
+/* 4. Contenedor del Login (CENTRADO Y CON SOMBRA) */
 .login-container {
     display: flex;
-    min-height: calc(100vh - 4rem);
+    min-height: 80vh; /* Para que no se vaya hasta abajo */
+    margin: 2rem auto;
+    max-width: 1200px;
     border-radius: var(--radius-3xl);
     overflow: hidden;
     box-shadow: var(--shadow-2xl);
@@ -168,22 +174,33 @@ header { visibility: hidden; }
 .secure-message { text-align: center; color: var(--text-400); font-size: 0.75rem; }
 
 /* ============================================================
-   ELIMINAR EL CUADRO BLANCO FEO DE STREAMLIT
+   FORZAR CENTRADO Y QUITAR ESPACIOS EN BLANCO
    ============================================================ */
-[data-testid="stMarkdownContainer"] {
-    background: transparent !important;
-    padding: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-}
 
-/* Eliminar contenedores verticales vacíos que Streamlit dibuja por error */
+/* 1. Ocultar los contenedores verticales vacíos de Streamlit */
 [data-testid="stVerticalBlock"] > div:empty {
     display: none !important;
 }
 
-/* Ajustar el margen superior para que no quede espacio en blanco */
+/* 2. Asegurar que el contenedor principal no estire la pantalla */
+.stApp {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+
 .block-container {
-    padding-top: 1rem !important;
-    margin-top: 0 !important;
+    padding-top: 0rem !important;
+    padding-bottom: 0rem !important;
+    margin-top: 0rem !important; /* Quitamos el -3rem para que no se empuje al fondo */
+    max-width: 100% !important;
+}
+
+/* 3. Centrar la tarjeta del login */
+.login-container {
+    margin: 4vh auto !important; /* 4vh de margen arriba y abajo, auto a los lados */
+    min-height: 85vh !important; /* Ocupa el 85% de la pantalla */
+    max-width: 1200px;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    background: #ffffff;
 }
