@@ -14,15 +14,9 @@ import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
-# 1. INICIALIZACIÓN A PRUEBA DE BALAS (Esto quita el KeyError)
-if "texto" not in st.session_state:
-    st.session_state.texto = ""
-if "letra_actual" not in st.session_state:
-    st.session_state.letra_actual = ""
-
 ARCHIVO_LETRA = "letra_actual.txt"
 
-@st.cache_resource(show_spinner="🧠 Cargando modelo de IA...")
+@st.cache_resource
 def load_model():
     model_path = Path(Config.ROOT_DIR) / "models" / "model.h5"
     labels_path = Path(Config.ROOT_DIR) / "models" / "labels.pkl"
@@ -91,6 +85,14 @@ class VideoProcessor(VideoProcessorBase):
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
+    # 🚨 INICIALIZACIÓN A PRUEBA DE BALAS (Esto arregla el error del celular)
+    if "texto" not in st.session_state:
+        st.session_state.texto = ""
+    if "letra_actual" not in st.session_state:
+        st.session_state.letra_actual = ""
+    if "ultima_letra_agregada" not in st.session_state:
+        st.session_state.ultima_letra_agregada = ""
+
     # --- DISEÑO CSS ---
     st.markdown("""
     <style>
@@ -108,6 +110,16 @@ def render_traductor():
             border: 1px solid #334155;
             position: relative;
             overflow: hidden;
+        }
+        .panel-traduccion::before {
+            content: '';
+            position: absolute;
+            top: -50px; right: -50px;
+            width: 150px; height: 150px;
+            background: #06b6d4;
+            filter: blur(80px);
+            opacity: 0.2;
+            border-radius: 50%;
         }
         .badge-idioma {
             background-color: rgba(6, 182, 212, 0.15);
@@ -140,15 +152,12 @@ def render_traductor():
 
     with col1:
         st.markdown("### 📷 Cámara en vivo")
-        try:
-            webrtc_streamer(
-                key="senavoz-video",
-                video_processor_factory=VideoProcessor,
-                rtc_configuration=RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}),
-                media_stream_constraints={"video": True, "audio": False},
-            )
-        except Exception as e:
-            st.warning("⚠️ No se pudo iniciar la cámara. Revisa los permisos de tu navegador.")
+        webrtc_streamer(
+            key="senavoz-video",
+            video_processor_factory=VideoProcessor,
+            rtc_configuration=RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}),
+            media_stream_constraints={"video": True, "audio": False},
+        )
 
     with col2:
         st.markdown("### ✨ Traducción")
