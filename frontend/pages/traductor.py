@@ -14,15 +14,10 @@ import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from backend.utils.config import Config
 
-# 1. El archivo donde la cámara escribirá la letra
+# Archivo temporal para guardar la letra detectada
 ARCHIVO_LETRA = "letra_actual.txt"
 
-if "texto" not in st.session_state:
-    st.session_state.texto = ""
-if "ultima_letra" not in st.session_state:
-    st.session_state.ultima_letra = ""
-
-@st.cache_resource
+@st.cache_resource(show_spinner="🧠 Cargando modelo de IA...")
 def load_model():
     model_path = Path(Config.ROOT_DIR) / "models" / "model.h5"
     labels_path = Path(Config.ROOT_DIR) / "models" / "labels.pkl"
@@ -78,8 +73,6 @@ class VideoProcessor(VideoProcessorBase):
                         letra = self.encoder.inverse_transform([np.argmax(prediction)])[0]
                         cv2.putText(img, f"Letra: {letra} ({confidence:.1f}%)", (20, 50), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                        
-                        # 2. ESCRIBIR LA LETRA EN EL ARCHIVO DE TEXTO
                         try:
                             with open(ARCHIVO_LETRA, "w") as f:
                                 f.write(letra)
@@ -93,6 +86,12 @@ class VideoProcessor(VideoProcessorBase):
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 def render_traductor():
+    # INICIALIZACIÓN A PRUEBA DE BALAS (Al principio de todo)
+    if "texto" not in st.session_state:
+        st.session_state.texto = ""
+    if "ultima_letra" not in st.session_state:
+        st.session_state.ultima_letra = ""
+
     # --- DISEÑO CSS ---
     st.markdown("""
     <style>
@@ -110,16 +109,6 @@ def render_traductor():
             border: 1px solid #334155;
             position: relative;
             overflow: hidden;
-        }
-        .panel-traduccion::before {
-            content: '';
-            position: absolute;
-            top: -50px; right: -50px;
-            width: 150px; height: 150px;
-            background: #06b6d4;
-            filter: blur(80px);
-            opacity: 0.2;
-            border-radius: 50%;
         }
         .badge-idioma {
             background-color: rgba(6, 182, 212, 0.15);
@@ -162,7 +151,7 @@ def render_traductor():
     with col2:
         st.markdown("### ✨ Traducción")
         
-        # 3. LEER LA LETRA DEL ARCHIVO CUANDO SE PRESIONA EL BOTÓN
+        # CAPTURAR LETRA
         if st.button("🔄 Capturar Letra", use_container_width=True, type="primary"):
             try:
                 if os.path.exists(ARCHIVO_LETRA):
@@ -171,11 +160,14 @@ def render_traductor():
                         if letra_leida:
                             st.session_state.texto += letra_leida
                             st.session_state.ultima_letra = letra_leida
-                            # Borramos el archivo para que no se repita la letra
                             os.remove(ARCHIVO_LETRA)
                             st.rerun()
             except Exception as e:
                 st.error(f"Error al leer: {e}")
+
+        # Inicialización forzada aquí también para evitar errores si se borra la sesión
+        if "texto" not in st.session_state:
+            st.session_state.texto = ""
 
         texto_mostrar = st.session_state.texto if st.session_state.texto else "El texto aparecerá aquí..."
         clase_texto = "texto-traducido" if st.session_state.texto else "texto-vacio"
@@ -189,6 +181,7 @@ def render_traductor():
         
         st.markdown("<br>", unsafe_allow_html=True)
 
+        # BORRAR TEXTO
         if st.button("🗑️ Borrar todo el texto", use_container_width=True):
             st.session_state.texto = ""
             st.session_state.ultima_letra = ""
